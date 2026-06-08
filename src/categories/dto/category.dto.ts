@@ -13,6 +13,10 @@ export class CreateCategoryDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @IsOptional()
+  @IsString()
+  image?: string;
 }
 
 export class UpdateCategoryDto {
@@ -27,4 +31,8 @@ export class UpdateCategoryDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @IsOptional()
+  @IsString()
+  image?: string;
 }

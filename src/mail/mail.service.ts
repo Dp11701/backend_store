@@ -18,26 +18,67 @@ export interface OrderMailData {
   note?: string;
 }
 
+export interface NewsletterProductItem {
+  title: string;
+  slug: string;
+  price: number;
+  originalPrice?: number;
+  image: string;
+  isSale: boolean;
+  isNew: boolean;
+}
+
+export interface NewsletterMailData {
+  newCount: number;
+  saleCount: number;
+  products: NewsletterProductItem[];
+}
+
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
   private transporter: Transporter | null = null;
+  private readonly configMessage: string | null;
 
   constructor(private config: ConfigService) {
-    const host = this.config.get('MAIL_HOST');
-    const user = this.config.get('MAIL_USER');
-    const pass = this.config.get('MAIL_PASS');
+    const host = this.config.get<string>('MAIL_HOST')?.trim();
+    const user = this.config.get<string>('MAIL_USER')?.trim();
+    const pass = this.config.get<string>('MAIL_PASS')?.trim();
 
-    if (host && user && pass) {
-      this.transporter = nodemailer.createTransport({
-        host,
-        port: Number(this.config.get('MAIL_PORT') ?? 587),
-        secure: false,
-        auth: { user, pass },
-      });
-    } else {
-      this.logger.warn('MAIL_* env vars not set — email sending disabled');
+    if (!host || !user || !pass) {
+      this.configMessage = 'Thiếu MAIL_HOST, MAIL_USER hoặc MAIL_PASS trong backend/.env';
+      this.logger.warn(`${this.configMessage} — email sending disabled`);
+      return;
     }
+
+    if (isPlaceholderMailCredentials(user, pass)) {
+      this.configMessage =
+        'MAIL_USER / MAIL_PASS đang là giá trị mẫu. Dùng Gmail thật + App Password tại myaccount.google.com/apppasswords';
+      this.logger.warn(`${this.configMessage} — email sending disabled`);
+      return;
+    }
+
+    this.configMessage = null;
+    this.transporter = nodemailer.createTransport({
+      host,
+      port: Number(this.config.get('MAIL_PORT') ?? 587),
+      secure: false,
+      auth: { user, pass: pass.replace(/\s/g, '') },
+    });
+  }
+
+  isConfigured(): boolean {
+    return this.transporter !== null;
+  }
+
+  getStatus(): { configured: boolean; message: string } {
+    if (this.transporter) {
+      return { configured: true, message: 'SMTP sẵn sàng' };
+    }
+    return {
+      configured: false,
+      message: this.configMessage ?? 'SMTP chưa cấu hình',
+    };
   }
 
   async sendOrderConfirmation(order: OrderMailData): Promise<void> {
@@ -56,14 +97,25 @@ export class MailService {
     });
   }
 
-  private async send(opts: { to: string; subject: string; html: string }): Promise<void> {
-    if (!this.transporter) return;
+  async sendNewsletterWelcome(to: string, data: NewsletterMailData): Promise<boolean> {
+    return this.send({
+      to,
+      subject: '✨ Chào mừng đến Maison Letter — Hàng mới & ưu đãi dành riêng cho bạn',
+      html: this.buildNewsletterEmail(data),
+    });
+  }
+
+  private async send(opts: { to: string; subject: string; html: string }): Promise<boolean> {
+    if (!this.transporter) return false;
     try {
       const from = this.config.get('MAIL_FROM') ?? `"Thiên Nga Store" <${this.config.get('MAIL_USER')}>`;
       await this.transporter.sendMail({ from, ...opts });
       this.logger.log(`Email sent → ${opts.to} | ${opts.subject}`);
+      return true;
     } catch (err) {
-      this.logger.error(`Email failed → ${opts.to}`, err);
+      const detail = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Email failed → ${opts.to}: ${detail}`);
+      return false;
     }
   }
 
@@ -223,4 +275,140 @@ export class MailService {
 </body>
 </html>`;
   }
+
+  private buildNewsletterEmail(data: NewsletterMailData): string {
+    const baseUrl = (this.config.get('FRONTEND_URL') ?? 'http://localhost:3000').replace(/\/$/, '');
+    const fmtVND = (n: number) =>
+      n.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
+
+    const newUrl = `${baseUrl}/tim-kiem?tag=${encodeURIComponent('Mới về')}`;
+    const saleUrl = `${baseUrl}/tim-kiem?tag=Sale`;
+
+    const productCards = data.products.length
+      ? data.products
+          .map((p) => {
+            const productUrl = `${baseUrl}/san-pham/${p.slug}`;
+            const badge = p.isNew
+              ? '<span style="display:inline-block;background:#111;color:#fff;font-size:10px;font-weight:700;letter-spacing:1px;padding:4px 8px;text-transform:uppercase">Mới về</span>'
+              : p.isSale
+                ? '<span style="display:inline-block;background:#b45309;color:#fff;font-size:10px;font-weight:700;letter-spacing:1px;padding:4px 8px;text-transform:uppercase">Sale</span>'
+                : '';
+            const priceBlock =
+              p.originalPrice && p.originalPrice > p.price
+                ? `<span style="font-size:13px;color:#999;text-decoration:line-through;margin-right:8px">${fmtVND(p.originalPrice)}</span>
+                   <span style="font-size:15px;font-weight:700;color:#b45309">${fmtVND(p.price)}</span>`
+                : `<span style="font-size:15px;font-weight:700;color:#111">${fmtVND(p.price)}</span>`;
+
+            return `
+            <td width="50%" style="padding:8px;vertical-align:top">
+              <a href="${productUrl}" style="text-decoration:none;color:inherit;display:block;border:1px solid #eee;border-radius:4px;overflow:hidden">
+                <img src="${p.image}" alt="${p.title}" width="100%" style="display:block;aspect-ratio:3/4;object-fit:cover;background:#f5f0eb" />
+                <div style="padding:14px 12px">
+                  ${badge ? `<div style="margin-bottom:8px">${badge}</div>` : ''}
+                  <p style="margin:0 0 8px;font-size:14px;font-weight:500;color:#111;line-height:1.4">${p.title}</p>
+                  <p style="margin:0">${priceBlock}</p>
+                </div>
+              </a>
+            </td>`;
+          })
+          .reduce<string[]>((rows, cell, i) => {
+            if (i % 2 === 0) rows.push('<tr>');
+            rows[rows.length - 1] += cell;
+            if (i % 2 === 1 || i === data.products.length - 1) {
+              if (i % 2 === 0) rows[rows.length - 1] += '<td width="50%"></td>';
+              rows[rows.length - 1] += '</tr>';
+            }
+            return rows;
+          }, [])
+          .join('')
+      : '';
+
+    const productSection = productCards
+      ? `<h2 style="margin:0 0 16px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:#999">
+           Gợi ý dành cho bạn
+         </h2>
+         <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px">
+           ${productCards}
+         </table>`
+      : '';
+
+    return `<!DOCTYPE html>
+<html lang="vi">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f5f0eb;font-family:Georgia,'Times New Roman',serif">
+  <table width="100%" cellpadding="0" cellspacing="0">
+    <tr><td align="center" style="padding:40px 16px">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#fff;border:1px solid #e8e0d8">
+
+        <tr>
+          <td style="padding:36px 32px 28px;text-align:center;border-bottom:1px solid #f0ebe4">
+            <p style="margin:0 0 8px;font-size:11px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:#888">Maison Letter</p>
+            <p style="margin:0;font-size:28px;font-style:italic;font-weight:400;color:#111">Thiên Nga Store</p>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:36px 32px">
+            <h1 style="margin:0 0 12px;font-size:24px;font-weight:400;font-style:italic;color:#111;line-height:1.3">
+              Chào mừng bạn đến với thế giới của quý cô hiện đại
+            </h1>
+            <p style="margin:0 0 28px;font-size:15px;line-height:1.7;color:#555;font-family:Arial,Helvetica,sans-serif">
+              Cảm ơn bạn đã đăng ký Maison Letter. Từ giờ, bạn sẽ là người đầu tiên biết về
+              <strong>bộ sưu tập mới</strong>, <strong>flash sale</strong> và những câu chuyện
+              thời trang đằng sau mỗi thiết kế — trước cả khi chúng lên kệ.
+            </p>
+
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px">
+              <tr>
+                <td width="48%" style="padding:20px;background:#faf7f4;border:1px solid #eee;border-radius:4px;vertical-align:top">
+                  <p style="margin:0 0 4px;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#888">Mới về</p>
+                  <p style="margin:0 0 12px;font-size:28px;font-weight:700;color:#111;font-family:Arial,sans-serif">${data.newCount || '—'}</p>
+                  <p style="margin:0 0 16px;font-size:13px;color:#666;font-family:Arial,sans-serif;line-height:1.5">Thiết kế vừa cập bến — tinh tế, thanh lịch, sẵn sàng cho mùa mới.</p>
+                  <a href="${newUrl}" style="display:inline-block;padding:12px 20px;background:#111;color:#fff;font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;text-decoration:none;font-family:Arial,sans-serif">Khám phá hàng mới</a>
+                </td>
+                <td width="4%"></td>
+                <td width="48%" style="padding:20px;background:#1a1a1a;border-radius:4px;vertical-align:top">
+                  <p style="margin:0 0 4px;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#c9a96e">Flash sale</p>
+                  <p style="margin:0 0 12px;font-size:28px;font-weight:700;color:#fff;font-family:Arial,sans-serif">${data.saleCount || '—'}</p>
+                  <p style="margin:0 0 16px;font-size:13px;color:#ccc;font-family:Arial,sans-serif;line-height:1.5">Ưu đãi có hạn — đừng bỏ lỡ những thiết kế yêu thích với giá đặc biệt.</p>
+                  <a href="${saleUrl}" style="display:inline-block;padding:12px 20px;background:#c9a96e;color:#111;font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;text-decoration:none;font-family:Arial,sans-serif">Xem ưu đãi</a>
+                </td>
+              </tr>
+            </table>
+
+            ${productSection}
+
+            <div style="text-align:center;padding:24px 0 8px;border-top:1px solid #f0ebe4">
+              <p style="margin:0 0 16px;font-size:14px;color:#666;font-family:Arial,sans-serif">
+                Một món quà nhỏ từ chúng tôi — miễn phí giao hàng cho đơn từ 1.500.000đ
+              </p>
+              <a href="${baseUrl}/danh-muc" style="display:inline-block;padding:14px 32px;border:1px solid #111;color:#111;font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;text-decoration:none;font-family:Arial,sans-serif">Mua sắm ngay</a>
+            </div>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:20px 32px;border-top:1px solid #f0ebe4;background:#faf7f4;text-align:center">
+            <p style="margin:0 0 6px;font-size:12px;color:#aaa;font-family:Arial,sans-serif">
+              © Thiên Nga Store · Hà Nội, Việt Nam
+            </p>
+            <p style="margin:0;font-size:11px;color:#ccc;font-family:Arial,sans-serif">
+              Bạn nhận email này vì đã đăng ký Maison Letter tại thienngastore.vn
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+  }
+}
+
+function isPlaceholderMailCredentials(user: string, pass: string): boolean {
+  if (/your@gmail\.com|example\.com|@email\.com/i.test(user)) return true;
+  if (/^x{3,}/i.test(pass.replace(/\s/g, ''))) return true;
+  if (/xxxx/i.test(pass)) return true;
+  return false;
 }

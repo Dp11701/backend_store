@@ -1,9 +1,29 @@
 /** Dữ liệu khởi tạo — đồng bộ với frontend mock */
 export const SEED_CATEGORIES = [
-  { categoryId: '1', slug: 'dam-cong-so', name: 'Đầm công sở' },
-  { categoryId: '2', slug: 'ao-cong-so', name: 'Áo công sở' },
-  { categoryId: '3', slug: 'vest', name: 'Vest' },
-  { categoryId: '4', slug: 'phu-kien', name: 'Phụ kiện' },
+  {
+    categoryId: '1',
+    slug: 'dam-cong-so',
+    name: 'Đầm công sở',
+    image: 'https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?w=800&h=1067&fit=crop&q=80',
+  },
+  {
+    categoryId: '2',
+    slug: 'ao-cong-so',
+    name: 'Áo công sở',
+    image: 'https://images.unsplash.com/photo-1591195853828-11db59a44f6b?w=800&h=1067&fit=crop&q=80',
+  },
+  {
+    categoryId: '3',
+    slug: 'vest',
+    name: 'Vest',
+    image: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?w=800&h=1067&fit=crop&q=80',
+  },
+  {
+    categoryId: '4',
+    slug: 'phu-kien',
+    name: 'Phụ kiện',
+    image: 'https://images.unsplash.com/photo-1611601322175-ef8ec8c85f01?w=800&h=1067&fit=crop&q=80',
+  },
 ];
 
 export const SEED_PRODUCTS = [

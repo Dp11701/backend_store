@@ -16,6 +16,7 @@ export class CategoriesService {
       slug: doc.slug,
       name: doc.name,
       description: doc.description,
+      image: doc.image,
     };
   }
 

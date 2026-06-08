@@ -8,6 +8,7 @@ import { SeedModule } from './seed/seed.module';
 import { AdminModule } from './admin/admin.module';
 import { OrdersModule } from './orders/orders.module';
 import { MailModule } from './mail/mail.module';
+import { NewsletterModule } from './newsletter/newsletter.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -34,6 +35,7 @@ import { HealthController } from './health.controller';
     SeedModule,
     AdminModule,
     MailModule,
+    NewsletterModule,
     OrdersModule,
   ],
   controllers: [HealthController],

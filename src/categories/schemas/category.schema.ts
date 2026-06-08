@@ -14,6 +14,9 @@ export class Category {
 
   @Prop()
   description?: string;
+
+  @Prop()
+  image?: string;
 }
 
 export type CategoryDocument = HydratedDocument<Category>;
