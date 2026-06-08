@@ -36,6 +36,10 @@ export class CreateVoucherDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  oncePerUser?: boolean;
 }
 
 export class UpdateVoucherDto {
@@ -76,4 +80,8 @@ export class UpdateVoucherDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  oncePerUser?: boolean;
 }

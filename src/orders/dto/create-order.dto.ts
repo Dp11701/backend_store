@@ -38,4 +38,5 @@ export class CreateOrderDto {
   @IsNumber() @Min(0) taxAmount!: number;
   @IsNumber() @IsPositive() total!: number;
   @IsString() @IsOptional() note?: string;
+  @IsString() @IsOptional() voucherCode?: string;
 }

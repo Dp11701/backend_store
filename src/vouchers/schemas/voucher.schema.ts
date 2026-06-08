@@ -32,6 +32,10 @@ export class Voucher {
 
   @Prop({ default: true })
   isActive!: boolean;
+
+  /** Mỗi tài khoản/guest chỉ được dùng mã này một lần */
+  @Prop({ default: false })
+  oncePerUser!: boolean;
 }
 
 export type VoucherDocument = HydratedDocument<Voucher>;

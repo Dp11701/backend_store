@@ -1,10 +1,12 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { ConfigService } from '@nestjs/config';
 import { Order, OrderDocument } from './schemas/order.schema';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { MailService } from '../mail/mail.service';
+import { UsersService } from '../users/users.service';
+import { VouchersService } from '../vouchers/vouchers.service';
 
 interface SepayWebhookBody {
   id: number;
@@ -26,26 +28,87 @@ export class OrdersService {
     @InjectModel(Order.name) private orderModel: Model<OrderDocument>,
     private config: ConfigService,
     private mail: MailService,
+    private users: UsersService,
+    private vouchers: VouchersService,
   ) {}
 
-  async createOrder(dto: CreateOrderDto) {
+  async createOrder(dto: CreateOrderDto, userId?: string | null) {
     const orderCode = Date.now();
     const transferContent = `TNG${orderCode}`;
     const isCod = dto.paymentMethod === 'cod';
 
+    let voucherCode = '';
+    let voucherDiscount = 0;
+    if (dto.voucherCode?.trim()) {
+      const voucher = await this.vouchers.validateForUser(
+        dto.voucherCode,
+        userId ?? null,
+        dto.subtotal,
+      );
+      voucherCode = voucher.code;
+      voucherDiscount = this.vouchers.calculateDiscount(voucher, dto.subtotal);
+    }
+
     await this.orderModel.create({
       orderCode,
+      userId: userId ?? null,
       ...dto,
+      voucherCode,
+      voucherDiscount,
       transferContent,
       paymentStatus: isCod ? 'cod' : 'pending',
       orderStatus: isCod ? 'confirmed' : 'pending',
     });
+
+    if (isCod && voucherCode && userId) {
+      await this.vouchers.recordUsage(userId, voucherCode, orderCode);
+    }
+
+    if (userId) {
+      void this.users.completeProfileFromOrder(userId, dto.customer, dto.shippingAddress);
+      const phone = dto.customer.phone?.trim();
+      if (phone) {
+        void this.orderModel.updateMany(
+          { userId: null, 'customer.phone': phone },
+          { $set: { userId } },
+        );
+      }
+    }
 
     if (isCod) {
       void this.mail.sendOrderConfirmation({ orderCode, transferContent, ...dto });
     }
 
     return { orderCode, transferContent };
+  }
+
+  private async userOrdersFilter(userId: string) {
+    const user = await this.users.findById(userId);
+    const phone = user?.phone?.trim();
+    if (phone) {
+      return {
+        $or: [{ userId }, { userId: null, 'customer.phone': phone }],
+      };
+    }
+    return { userId };
+  }
+
+  async listOrdersByUser(userId: string) {
+    const filter = await this.userOrdersFilter(userId);
+    return this.orderModel
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .select(
+        'orderCode paymentStatus orderStatus total subtotal shippingCost shippingMethod voucherCode voucherDiscount taxAmount paymentMethod customer shippingAddress items createdAt transferContent note',
+      )
+      .lean();
+  }
+
+  async getOrderForUser(userId: string, orderCode: number) {
+    const filter = await this.userOrdersFilter(userId);
+    const order = await this.orderModel.findOne({ ...filter, orderCode }).lean();
+    if (!order) throw new NotFoundException('Order not found');
+    return order;
   }
 
   async listOrders() {
@@ -96,6 +159,10 @@ export class OrdersService {
         transactionRef: body.referenceCode ?? body.code ?? '',
       },
     );
+
+    if (order.voucherCode && order.userId) {
+      await this.vouchers.recordUsage(order.userId, order.voucherCode, orderCode);
+    }
 
     void this.mail.sendPaymentConfirmation({
       orderCode:       order.orderCode,

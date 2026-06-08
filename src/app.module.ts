@@ -7,6 +7,8 @@ import { VouchersModule } from './vouchers/vouchers.module';
 import { SeedModule } from './seed/seed.module';
 import { AdminModule } from './admin/admin.module';
 import { OrdersModule } from './orders/orders.module';
+import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
 import { MailModule } from './mail/mail.module';
 import { NewsletterModule } from './newsletter/newsletter.module';
 import { HealthController } from './health.controller';
@@ -36,6 +38,8 @@ import { HealthController } from './health.controller';
     AdminModule,
     MailModule,
     NewsletterModule,
+    UsersModule,
+    AuthModule,
     OrdersModule,
   ],
   controllers: [HealthController],
