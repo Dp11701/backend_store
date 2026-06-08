@@ -13,7 +13,7 @@ NEXT_PUBLIC_MEDIA_BASE_URL=https://your-cdn.cloudfront.net
 
 ```env
 PORT=8888
-CORS_ORIGIN=http://localhost:3000,http://localhost:8080
+# CORS: API chấp nhận mọi origin (origin: true). Biến CORS_ORIGIN không còn dùng.
 
 MONGODB_URI=mongodb+srv://USER:PASSWORD@YOUR_CLUSTER.mongodb.net/thiennga?retryWrites=true&w=majority
 

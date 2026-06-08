@@ -4,11 +4,8 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  const corsOrigins = (process.env.CORS_ORIGIN ?? 'http://localhost:3000,http://localhost:8080')
-    .split(',')
-    .map((o) => o.trim());
 
-  app.enableCors({ origin: corsOrigins, credentials: true });
+  app.enableCors({ origin: true, credentials: true });
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -19,7 +16,7 @@ async function bootstrap() {
 
   const port = Number(process.env.PORT ?? 8888);
   await app.listen(port);
-  console.log(`API http://localhost:${port}/api (CORS: ${corsOrigins.join(', ')})`);
+  console.log(`API http://localhost:${port}/api (CORS: all origins)`);
 }
 
 bootstrap();
