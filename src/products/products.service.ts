@@ -201,6 +201,44 @@ export class ProductsService {
     return this.toDto(doc as ProductDocument);
   }
 
+  /** Giá trị lưu DB — dùng cho CMS chỉnh sửa (không resolve sale theo thời gian) */
+  private toStoredDto(doc: ProductDocument | Product) {
+    return {
+      id: doc.productId,
+      slug: doc.slug,
+      sku: doc.sku,
+      title: doc.title,
+      categorySlug: doc.categorySlug,
+      collection: doc.collection,
+      price: doc.price,
+      originalPrice: doc.originalPrice,
+      rating: doc.rating,
+      reviews: doc.reviews,
+      sold: doc.sold,
+      image: doc.image,
+      images: doc.images,
+      colors: doc.colors,
+      sizes: doc.sizes,
+      description: doc.description,
+      material: doc.material,
+      origin: doc.origin,
+      lining: doc.lining,
+      fit: doc.fit,
+      modelHeight: doc.modelHeight,
+      inStock: doc.inStock,
+      isSale: doc.isSale,
+      saleStartsAt: doc.saleStartsAt ? new Date(doc.saleStartsAt).toISOString() : undefined,
+      saleEndsAt: doc.saleEndsAt ? new Date(doc.saleEndsAt).toISOString() : undefined,
+      isNew: doc.isNew,
+    };
+  }
+
+  async findByProductIdStored(id: string) {
+    const doc = await this.productModel.findOne({ productId: id }).lean();
+    if (!doc) throw new NotFoundException(`Product ${id} not found`);
+    return this.toStoredDto(doc as ProductDocument);
+  }
+
   async count() {
     return this.productModel.countDocuments();
   }
