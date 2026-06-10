@@ -19,6 +19,12 @@ export class ProductsController {
     return this.productsService.getFacets(category.trim());
   }
 
+  /** Thời gian kết thúc flash sale gần nhất (cho countdown homepage) */
+  @Get('flash-sale')
+  flashSale() {
+    return this.productsService.getFlashSaleMeta();
+  }
+
   @Get('slug/:slug')
   bySlug(@Param('slug') slug: string) {
     return this.productsService.findBySlug(slug);

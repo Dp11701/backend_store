@@ -18,16 +18,21 @@ export class SeedService {
       return { skipped: true, message: 'Database already seeded', productCount: count };
     }
 
-    const [categories, products, vouchers] = await Promise.all([
+    const saleEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const products = SEED_PRODUCTS.map((p) =>
+      p.isSale ? { ...p, saleStartsAt: new Date(), saleEndsAt } : p,
+    );
+
+    const [categories, productResult, vouchers] = await Promise.all([
       this.categoriesService.upsertMany(SEED_CATEGORIES),
-      this.productsService.upsertMany(SEED_PRODUCTS),
+      this.productsService.upsertMany(products),
       this.vouchersService.upsertMany(SEED_VOUCHERS),
     ]);
 
     return {
       skipped: false,
       categories,
-      products,
+      products: productResult,
       vouchers,
       productCount: await this.productsService.count(),
     };

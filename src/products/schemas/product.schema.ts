@@ -74,10 +74,10 @@ export class Product {
   @Prop({ required: true })
   description!: string;
 
-  @Prop({ required: true })
+  @Prop({ default: '' })
   material!: string;
 
-  @Prop({ required: true })
+  @Prop({ default: '' })
   origin!: string;
 
   @Prop()
@@ -94,6 +94,14 @@ export class Product {
 
   @Prop({ default: false })
   isSale!: boolean;
+
+  /** Bắt đầu giảm giá — nếu null thì áp dụng ngay khi isSale */
+  @Prop({ type: Date, default: null })
+  saleStartsAt!: Date | null;
+
+  /** Kết thúc sale — hết giờ API trả giá gốc (originalPrice) */
+  @Prop({ type: Date, default: null })
+  saleEndsAt!: Date | null;
 
   @Prop({ default: false })
   isNew!: boolean;

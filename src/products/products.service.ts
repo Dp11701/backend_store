@@ -4,14 +4,34 @@ import { Model, SortOrder } from 'mongoose';
 import { Product, ProductDocument } from './schemas/product.schema';
 import { CreateProductDto, UpdateProductDto } from './dto/product.dto';
 import type { ProductListQuery } from './product-list.query';
+import {
+  activeSaleMongoFilter,
+  isSaleScheduleActive,
+  resolveProductPricing,
+} from './sale-pricing';
 
 @Injectable()
 export class ProductsService {
   constructor(
-    @InjectModel(Product.name) private readonly productModel: Model<ProductDocument>
+    @InjectModel(Product.name) private readonly productModel: Model<ProductDocument>,
   ) {}
 
-  private toDto(doc: ProductDocument | (Product & { productId: string })) {
+  private parseSaleDates(dto: {
+    saleStartsAt?: string | null;
+    saleEndsAt?: string | null;
+  }) {
+    const patch: Record<string, Date | null> = {};
+    if (dto.saleStartsAt !== undefined) {
+      patch.saleStartsAt = dto.saleStartsAt ? new Date(dto.saleStartsAt) : null;
+    }
+    if (dto.saleEndsAt !== undefined) {
+      patch.saleEndsAt = dto.saleEndsAt ? new Date(dto.saleEndsAt) : null;
+    }
+    return patch;
+  }
+
+  private toDto(doc: ProductDocument | Product) {
+    const pricing = resolveProductPricing(doc);
     return {
       id: doc.productId,
       slug: doc.slug,
@@ -19,8 +39,8 @@ export class ProductsService {
       title: doc.title,
       categorySlug: doc.categorySlug,
       collection: doc.collection,
-      price: doc.price,
-      originalPrice: doc.originalPrice,
+      price: pricing.price,
+      originalPrice: pricing.originalPrice,
       rating: doc.rating,
       reviews: doc.reviews,
       sold: doc.sold,
@@ -35,7 +55,9 @@ export class ProductsService {
       fit: doc.fit,
       modelHeight: doc.modelHeight,
       inStock: doc.inStock,
-      isSale: doc.isSale,
+      isSale: pricing.isSale,
+      saleStartsAt: pricing.saleStartsAt,
+      saleEndsAt: pricing.saleEndsAt,
       isNew: doc.isNew,
     };
   }
@@ -44,7 +66,9 @@ export class ProductsService {
     const filter: Record<string, unknown> = {};
     if (query?.category) filter.categorySlug = query.category;
     if (query?.isNew === true) filter.isNew = true;
-    if (query?.isSale === true) filter.isSale = true;
+    if (query?.isSale === true) {
+      Object.assign(filter, activeSaleMongoFilter());
+    }
     if (query?.inStock === true) filter.inStock = true;
     if (query?.search) {
       const q = query.search.trim();
@@ -98,20 +122,49 @@ export class ProductsService {
     return docs.map((d) => this.toDto(d as ProductDocument));
   }
 
+  async getFlashSaleMeta() {
+    const now = new Date();
+    const docs = await this.productModel
+      .find({
+        ...activeSaleMongoFilter(now),
+        originalPrice: { $exists: true, $gt: 0 },
+      })
+      .select('saleEndsAt saleStartsAt price originalPrice isSale')
+      .lean();
+
+    const active = docs.filter((d) => isSaleScheduleActive(d as Product, now));
+    const endTimes = active
+      .map((d) => (d.saleEndsAt ? new Date(d.saleEndsAt).getTime() : null))
+      .filter((t): t is number => t != null && t > now.getTime());
+
+    return {
+      active: active.length > 0,
+      endsAt: endTimes.length > 0 ? new Date(Math.min(...endTimes)).toISOString() : null,
+      productCount: active.length,
+    };
+  }
+
   async getFacets(categorySlug: string) {
     const docs = await this.productModel
       .find({ categorySlug })
-      .select('price colors sizes inStock isSale isNew')
+      .select('price colors sizes inStock isSale isNew originalPrice saleStartsAt saleEndsAt')
       .lean();
 
     const colorMap = new Map<string, string>();
     const sizeSet = new Set<string>();
     let priceMin = Infinity;
     let priceMax = 0;
+    let saleCount = 0;
+    let newCount = 0;
+    let inStockCount = 0;
 
     for (const doc of docs) {
-      if (doc.price < priceMin) priceMin = doc.price;
-      if (doc.price > priceMax) priceMax = doc.price;
+      const pricing = resolveProductPricing(doc as Product);
+      if (pricing.price < priceMin) priceMin = pricing.price;
+      if (pricing.price > priceMax) priceMax = pricing.price;
+      if (pricing.isSale) saleCount += 1;
+      if (doc.isNew) newCount += 1;
+      if (doc.inStock !== false) inStockCount += 1;
       for (const c of doc.colors ?? []) {
         if (c?.name && c?.code) colorMap.set(c.name, c.code);
       }
@@ -130,9 +183,9 @@ export class ProductsService {
         const order = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free size'];
         return order.indexOf(a) - order.indexOf(b);
       }),
-      saleCount: docs.filter((d) => d.isSale).length,
-      newCount: docs.filter((d) => d.isNew).length,
-      inStockCount: docs.filter((d) => d.inStock !== false).length,
+      saleCount,
+      newCount,
+      inStockCount,
     };
   }
 
@@ -159,24 +212,46 @@ export class ProductsService {
     if (exists) {
       throw new ConflictException('productId hoặc slug đã tồn tại');
     }
+    const saleDates = this.parseSaleDates(dto);
     const doc = await this.productModel.create({
-      ...dto,
-      images: dto.images ?? [],
-      colors: dto.colors ?? [],
-      sizes: dto.sizes ?? [],
+      productId: dto.productId,
+      slug: dto.slug,
+      sku: dto.sku,
+      title: dto.title,
+      categorySlug: dto.categorySlug,
+      collection: dto.collection,
+      price: dto.price,
+      originalPrice: dto.originalPrice,
       rating: dto.rating ?? 0,
       reviews: dto.reviews ?? 0,
       sold: dto.sold ?? 0,
+      image: dto.image,
+      images: dto.images ?? [],
+      colors: dto.colors ?? [],
+      sizes: dto.sizes ?? [],
+      description: dto.description,
+      material: dto.material,
+      origin: dto.origin,
+      lining: dto.lining,
+      fit: dto.fit,
+      modelHeight: dto.modelHeight,
       inStock: dto.inStock ?? true,
       isSale: dto.isSale ?? false,
       isNew: dto.isNew ?? false,
+      saleStartsAt: saleDates.saleStartsAt ?? null,
+      saleEndsAt: saleDates.saleEndsAt ?? null,
     });
     return this.toDto(doc);
   }
 
   async update(productId: string, dto: UpdateProductDto) {
+    const patch: Record<string, unknown> = { ...dto };
+    delete patch.saleStartsAt;
+    delete patch.saleEndsAt;
+    Object.assign(patch, this.parseSaleDates(dto));
+
     const doc = await this.productModel
-      .findOneAndUpdate({ productId }, { $set: dto }, { new: true })
+      .findOneAndUpdate({ productId }, { $set: patch }, { new: true })
       .lean();
     if (!doc) throw new NotFoundException(`Product ${productId} not found`);
     return this.toDto(doc as ProductDocument);
@@ -198,7 +273,7 @@ export class ProductsService {
     }));
     if (ops.length === 0) return { upserted: 0 };
     const result = await this.productModel.bulkWrite(
-      ops as Parameters<typeof this.productModel.bulkWrite>[0]
+      ops as Parameters<typeof this.productModel.bulkWrite>[0],
     );
     return {
       upserted: result.upsertedCount + result.modifiedCount,
