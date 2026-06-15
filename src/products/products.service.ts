@@ -9,6 +9,7 @@ import {
   isSaleScheduleActive,
   resolveProductPricing,
 } from './sale-pricing';
+import { randomProductStats } from '../seed/product-stats.util';
 
 @Injectable()
 export class ProductsService {
@@ -315,6 +316,39 @@ export class ProductsService {
     );
     return {
       upserted: result.upsertedCount + result.modifiedCount,
+    };
+  }
+
+  async randomizeProductStats() {
+    const docs = await this.productModel.find().select('productId title').lean();
+    if (docs.length === 0) {
+      return { updated: 0, productCount: 0, products: [] as { id: string; sold: number; reviews: number; rating: number }[] };
+    }
+
+    const products: { id: string; title: string; sold: number; reviews: number; rating: number }[] = [];
+    const ops = docs.map((doc) => {
+      const stats = randomProductStats();
+      products.push({
+        id: doc.productId,
+        title: doc.title,
+        ...stats,
+      });
+      return {
+        updateOne: {
+          filter: { productId: doc.productId },
+          update: { $set: stats },
+        },
+      };
+    });
+
+    const result = await this.productModel.bulkWrite(
+      ops as Parameters<typeof this.productModel.bulkWrite>[0],
+    );
+
+    return {
+      updated: result.modifiedCount,
+      productCount: docs.length,
+      products,
     };
   }
 }

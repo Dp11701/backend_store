@@ -9,4 +9,9 @@ export class SeedController {
   run(@Query('force') force?: string) {
     return this.seedService.run(force === 'true');
   }
+
+  @Post('stats')
+  randomizeStats() {
+    return this.seedService.randomizeProductStats();
+  }
 }

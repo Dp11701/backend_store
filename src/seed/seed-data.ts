@@ -289,6 +289,7 @@ export const SEED_VOUCHERS = [
     usedCount: 891,
     expiresAt: new Date('2026-12-31'),
     isActive: true,
+    isPublic: true,
   },
   {
     voucherId: 'v1',
@@ -301,5 +302,6 @@ export const SEED_VOUCHERS = [
     usedCount: 342,
     expiresAt: new Date('2026-12-31'),
     isActive: true,
+    isPublic: true,
   },
 ];

@@ -12,6 +12,15 @@ import { CreateVoucherDto, UpdateVoucherDto } from './dto/voucher.dto';
 
 export type VoucherDto = ReturnType<VouchersService['toDto']>;
 
+/** Voucher cũ chưa có field isPublic — coi là public */
+function isPublicVoucher(doc: { isPublic?: boolean }) {
+  return doc.isPublic !== false;
+}
+
+const PUBLIC_VOUCHER_FILTER = {
+  $or: [{ isPublic: true }, { isPublic: { $exists: false } }],
+} as const;
+
 @Injectable()
 export class VouchersService {
   constructor(
@@ -36,6 +45,7 @@ export class VouchersService {
           : String(doc.expiresAt),
       isActive: doc.isActive,
       oncePerUser: doc.oncePerUser ?? false,
+      isPublic: isPublicVoucher(doc),
     };
   }
 
@@ -47,14 +57,22 @@ export class VouchersService {
   async findActive() {
     const now = new Date();
     const docs = await this.voucherModel
-      .find({ isActive: true, expiresAt: { $gte: now } })
+      .find({
+        isActive: true,
+        expiresAt: { $gte: now },
+        ...PUBLIC_VOUCHER_FILTER,
+      })
       .lean();
     return docs.map((d) => this.toDto(d as VoucherDocument));
   }
 
   async findByCode(code: string) {
     const doc = await this.voucherModel
-      .findOne({ code: code.toUpperCase(), isActive: true })
+      .findOne({
+        code: code.toUpperCase(),
+        isActive: true,
+        ...PUBLIC_VOUCHER_FILTER,
+      })
       .lean();
     if (!doc) throw new NotFoundException('Voucher not found');
     return this.toDto(doc as VoucherDocument);
@@ -152,6 +170,7 @@ export class VouchersService {
       usedCount: dto.usedCount ?? 0,
       isActive: dto.isActive ?? true,
       oncePerUser: dto.oncePerUser ?? false,
+      isPublic: dto.isPublic ?? true,
     });
     return this.toDto(doc);
   }

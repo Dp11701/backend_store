@@ -36,6 +36,10 @@ export class Voucher {
   /** Mỗi tài khoản/guest chỉ được dùng mã này một lần */
   @Prop({ default: false })
   oncePerUser!: boolean;
+
+  /** Hiển thị trên web (PDP, tài khoản). Mã private vẫn áp được nếu khách nhập tay */
+  @Prop({ default: true })
+  isPublic!: boolean;
 }
 
 export type VoucherDocument = HydratedDocument<Voucher>;

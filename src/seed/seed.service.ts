@@ -3,6 +3,7 @@ import { CategoriesService } from '../categories/categories.service';
 import { ProductsService } from '../products/products.service';
 import { VouchersService } from '../vouchers/vouchers.service';
 import { SEED_CATEGORIES, SEED_PRODUCTS, SEED_VOUCHERS } from './seed-data';
+import { randomProductStats } from './product-stats.util';
 
 @Injectable()
 export class SeedService {
@@ -19,9 +20,11 @@ export class SeedService {
     }
 
     const saleEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    const products = SEED_PRODUCTS.map((p) =>
-      p.isSale ? { ...p, saleStartsAt: new Date(), saleEndsAt } : p,
-    );
+    const products = SEED_PRODUCTS.map((p) => {
+      const stats = randomProductStats();
+      const salePatch = p.isSale ? { saleStartsAt: new Date(), saleEndsAt } : {};
+      return { ...p, ...stats, ...salePatch };
+    });
 
     const [categories, productResult, vouchers] = await Promise.all([
       this.categoriesService.upsertMany(SEED_CATEGORIES),
@@ -36,5 +39,9 @@ export class SeedService {
       vouchers,
       productCount: await this.productsService.count(),
     };
+  }
+
+  async randomizeProductStats() {
+    return this.productsService.randomizeProductStats();
   }
 }
