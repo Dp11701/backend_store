@@ -371,13 +371,10 @@ export class StylistJobsService {
       return null;
     }
 
-    // IMAGE 1 = ảnh user (chỉ lấy mặt), IMAGE 2 = ảnh sản phẩm (tái tạo bộ đồ)
-    const images = [userImage];
     const garmentUrl = product.tryOnImage || product.image;
-    if (garmentUrl) {
-      const productImage = await this.gemini.fetchImageFromUrl(garmentUrl);
-      if (productImage) images.push(productImage);
-    }
+    const garmentImage = garmentUrl
+      ? await this.gemini.fetchImageFromUrl(garmentUrl)
+      : null;
 
     // Dòng số đo → dựng dáng người tương đối giống khách (nếu có)
     const bodyLine =
@@ -389,28 +386,46 @@ export class StylistJobsService {
         ? `Give the model natural, realistic female body proportions approximately: height ${measurements.height}cm, bust ${measurements.bust}cm, waist ${measurements.waist}cm, hip ${measurements.hip}cm.`
         : 'Give the model natural, realistic female body proportions.';
 
-    const prompt = [
+    await this.patchJob(jobId, { tryOnStatus: 'processing' });
+
+    // ── PASS 1 — dựng mẫu 3/4 thân mặc đúng outfit (mặt lấy theo ảnh user) ──
+    // IMAGE 1 = ảnh user (tham chiếu mặt), IMAGE 2 = ảnh sản phẩm flat-lay
+    const pass1Images = garmentImage ? [userImage, garmentImage] : [userImage];
+    const pass1Prompt = [
       'You are a professional fashion lookbook image generator.',
-      'IMAGE 1 is a real person — use ONLY their face and head (facial features, hairstyle, skin tone). Do NOT copy their clothing, body or background.',
-      'IMAGE 2 is a clothing product photographed flat (flat-lay). Reproduce this exact outfit faithfully: colors, pattern, cut and details. Ignore the hanger, tags, floor and any background objects.',
-      `TASK: generate ONE photorealistic full-body fashion lookbook photo of a female model WEARING this exact outfit ("${productTitle}"), with the FACE of the person from IMAGE 1.`,
+      'IMAGE 1 is a real person — use their face and hairstyle as the model identity reference. Do NOT copy their clothing or background.',
+      garmentImage
+        ? 'IMAGE 2 is a clothing product photographed flat (flat-lay). Reproduce this exact outfit faithfully: colors, pattern, cut, length and details. Ignore the hanger, tags, floor and background objects.'
+        : `Recreate the outfit "${productTitle}" faithfully.`,
+      `TASK: generate ONE photorealistic THREE-QUARTER body fashion photo, tightly framed from the top of the head down to just above the knees, of a female model WEARING this outfit ("${productTitle}"). The model stands front-facing and looks at the camera so the FACE is large and clearly visible.`,
       bodyLine,
-      'Standing relaxed pose, full body visible head to toe, soft studio lighting, clean light-grey seamless background, premium fashion lookbook quality.',
+      'Soft studio lighting, clean light-grey seamless background, premium fashion lookbook quality.',
       'No text, no price tags, no hanger, no watermark.',
     ].join('\n');
 
-    await this.patchJob(jobId, { tryOnStatus: 'processing' });
-
-    const generated = await this.gemini.generateTryOnImage(prompt, images);
-    if (!generated) {
+    const pass1 = await this.gemini.generateTryOnImage(pass1Prompt, pass1Images);
+    if (!pass1) {
       await this.patchJob(jobId, { tryOnStatus: 'failed' });
       return null;
     }
 
+    // ── PASS 2 — swap đúng mặt user vào mẫu (tác vụ edit, giữ đồ/dáng) ──
+    // IMAGE 1 = ảnh mẫu vừa dựng, IMAGE 2 = ảnh user
+    const pass2Prompt = [
+      'You are a precise photo face-swap editor given TWO images.',
+      'IMAGE 1 is a fashion photo of a model. Keep EVERYTHING unchanged: the body, outfit, pose, hands, lighting, background and framing.',
+      'IMAGE 2 is a real person. Replace ONLY the head and face of the model in IMAGE 1 with the EXACT face, facial identity and hairstyle of the person in IMAGE 2.',
+      'Match skin tone and lighting for a seamless, photorealistic result. Do NOT change the outfit or body. Output the edited IMAGE 1.',
+    ].join('\n');
+
+    const pass2 = await this.gemini.generateTryOnImage(pass2Prompt, [pass1, userImage]);
+    // Nếu swap mặt lỗi → vẫn dùng ảnh pass 1 (đã mặc đúng đồ)
+    const finalImage = pass2 ?? pass1;
+
     try {
       const uploaded = await this.uploads.uploadBuffer(
-        generated.buffer,
-        generated.mimeType,
+        finalImage.buffer,
+        finalImage.mimeType,
         'stylist',
         'try-on.png',
       );
