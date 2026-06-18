@@ -60,6 +60,8 @@ export class ProductsService {
       saleStartsAt: pricing.saleStartsAt,
       saleEndsAt: pricing.saleEndsAt,
       isNew: doc.isNew,
+      sizeChartId: doc.sizeChartId,
+      tryOnImage: doc.tryOnImage,
     };
   }
 
@@ -231,6 +233,8 @@ export class ProductsService {
       saleStartsAt: doc.saleStartsAt ? new Date(doc.saleStartsAt).toISOString() : undefined,
       saleEndsAt: doc.saleEndsAt ? new Date(doc.saleEndsAt).toISOString() : undefined,
       isNew: doc.isNew,
+      sizeChartId: doc.sizeChartId,
+      tryOnImage: doc.tryOnImage,
     };
   }
 
@@ -279,6 +283,8 @@ export class ProductsService {
       isNew: dto.isNew ?? false,
       saleStartsAt: saleDates.saleStartsAt ?? null,
       saleEndsAt: saleDates.saleEndsAt ?? null,
+      sizeChartId: dto.sizeChartId,
+      tryOnImage: dto.tryOnImage,
     });
     return this.toDto(doc);
   }

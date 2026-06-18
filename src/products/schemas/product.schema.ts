@@ -105,6 +105,14 @@ export class Product {
 
   @Prop({ default: false })
   isNew!: boolean;
+
+  /** Bảng size cho tư vấn AI / PDP */
+  @Prop()
+  sizeChartId?: string;
+
+  /** Ảnh flat/ghost mannequin — dùng virtual try-on (phase 3) */
+  @Prop()
+  tryOnImage?: string;
 }
 
 export type ProductDocument = HydratedDocument<Product>;

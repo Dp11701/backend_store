@@ -67,3 +67,26 @@ Allowed origins: `http://localhost:8080`, domain CMS production.
 | API | http://localhost:8888/api |
 | CMS | http://localhost:8080 |
 | Store | http://localhost:3000 |
+
+## Stylist / bảng size (Phase 0)
+
+Seed bảng size mặc định (khi API đang chạy):
+
+```bash
+curl -X POST http://localhost:8888/api/seed/size-charts
+# hoặc từ root store:
+pnpm seed:size-charts
+```
+
+API public: `GET /api/size-charts`, `GET /api/size-charts/resolve?sizeChartId=&categorySlug=`
+
+## Stylist / Gemini (Phase 1)
+
+```env
+GEMINI_API_KEY=your-google-ai-api-key
+GEMINI_MODEL=gemini-2.5-flash
+```
+
+API: `GET /api/stylist/status`, `POST /api/stylist/recommend` với body `{ productId, height, bust, waist, hip }`.
+
+**Không commit** `GEMINI_API_KEY` — chỉ đặt trong `backend/.env`.

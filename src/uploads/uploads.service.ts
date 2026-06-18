@@ -8,7 +8,7 @@ import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { randomBytes } from 'crypto';
 import { extname } from 'path';
 
-export type UploadFolder = 'products' | 'categories' | 'misc';
+export type UploadFolder = 'products' | 'categories' | 'misc' | 'stylist';
 
 const DEFAULT_MAX_BYTES = 5 * 1024 * 1024;
 const DEFAULT_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -83,6 +83,10 @@ export class UploadsService {
     };
   }
 
+  getPublicBaseUrl(): string {
+    return this.publicBase;
+  }
+
   async upload(
     file: Express.Multer.File,
     folder: UploadFolder
@@ -105,7 +109,7 @@ export class UploadsService {
       throw new BadRequestException(`Định dạng không hỗ trợ: ${mime}`);
     }
 
-    const safeFolder = ['products', 'categories', 'misc'].includes(folder)
+    const safeFolder = ['products', 'categories', 'misc', 'stylist'].includes(folder)
       ? folder
       : 'misc';
     const key = `${this.prefix}/${safeFolder}/${Date.now()}-${randomBytes(4).toString('hex')}-${safeFilename(file.originalname)}`;
@@ -125,6 +129,23 @@ export class UploadsService {
     }
 
     return { key, url: `${this.publicBase}/${key}` };
+  }
+
+  async uploadBuffer(
+    buffer: Buffer,
+    mime: string,
+    folder: UploadFolder,
+    originalName = 'generated.png',
+  ): Promise<{ url: string; key: string }> {
+    return this.upload(
+      {
+        buffer,
+        size: buffer.length,
+        mimetype: mime,
+        originalname: originalName,
+      } as Express.Multer.File,
+      folder,
+    );
   }
 }
 

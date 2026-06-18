@@ -11,6 +11,8 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { MailModule } from './mail/mail.module';
 import { NewsletterModule } from './newsletter/newsletter.module';
+import { SizeChartsModule } from './size-charts/size-charts.module';
+import { StylistModule } from './stylist/stylist.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -33,6 +35,7 @@ import { HealthController } from './health.controller';
     }),
     ProductsModule,
     CategoriesModule,
+    SizeChartsModule,
     VouchersModule,
     SeedModule,
     AdminModule,
@@ -41,6 +44,7 @@ import { HealthController } from './health.controller';
     UsersModule,
     AuthModule,
     OrdersModule,
+    StylistModule,
   ],
   controllers: [HealthController],
 })

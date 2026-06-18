@@ -8,14 +8,17 @@ import { AdminProductsController } from './admin-products.controller';
 import { AdminCategoriesController } from './admin-categories.controller';
 import { AdminVouchersController } from './admin-vouchers.controller';
 import { AdminOrdersController } from './admin-orders.controller';
+import { SizeChartsModule } from '../size-charts/size-charts.module';
+import { AdminSizeChartsController } from './admin-size-charts.controller';
 
 @Module({
-  imports: [ProductsModule, CategoriesModule, VouchersModule, UploadsModule, OrdersModule],
+  imports: [ProductsModule, CategoriesModule, VouchersModule, UploadsModule, OrdersModule, SizeChartsModule],
   controllers: [
     AdminProductsController,
     AdminCategoriesController,
     AdminVouchersController,
     AdminOrdersController,
+    AdminSizeChartsController,
   ],
 })
 export class AdminModule {}

@@ -17,9 +17,11 @@ function isPublicVoucher(doc: { isPublic?: boolean }) {
   return doc.isPublic !== false;
 }
 
-const PUBLIC_VOUCHER_FILTER = {
-  $or: [{ isPublic: true }, { isPublic: { $exists: false } }],
-} as const;
+function publicVoucherFilter() {
+  return {
+    $or: [{ isPublic: true }, { isPublic: { $exists: false } }],
+  };
+}
 
 @Injectable()
 export class VouchersService {
@@ -60,7 +62,7 @@ export class VouchersService {
       .find({
         isActive: true,
         expiresAt: { $gte: now },
-        ...PUBLIC_VOUCHER_FILTER,
+        ...publicVoucherFilter(),
       })
       .lean();
     return docs.map((d) => this.toDto(d as VoucherDocument));
@@ -71,7 +73,7 @@ export class VouchersService {
       .findOne({
         code: code.toUpperCase(),
         isActive: true,
-        ...PUBLIC_VOUCHER_FILTER,
+        ...publicVoucherFilter(),
       })
       .lean();
     if (!doc) throw new NotFoundException('Voucher not found');

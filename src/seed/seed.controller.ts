@@ -14,4 +14,9 @@ export class SeedController {
   randomizeStats() {
     return this.seedService.randomizeProductStats();
   }
+
+  @Post('size-charts')
+  seedSizeCharts() {
+    return this.seedService.seedSizeCharts();
+  }
 }

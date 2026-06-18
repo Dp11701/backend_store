@@ -127,6 +127,14 @@ export class CreateProductDto {
   @IsOptional()
   @IsBoolean()
   isNew?: boolean;
+
+  @IsOptional()
+  @IsString()
+  sizeChartId?: string;
+
+  @IsOptional()
+  @IsString()
+  tryOnImage?: string;
 }
 
 export class UpdateProductDto {
@@ -236,4 +244,12 @@ export class UpdateProductDto {
   @IsOptional()
   @IsBoolean()
   isNew?: boolean;
+
+  @IsOptional()
+  @IsString()
+  sizeChartId?: string;
+
+  @IsOptional()
+  @IsString()
+  tryOnImage?: string;
 }
